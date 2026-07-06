@@ -965,17 +965,19 @@ def parse_adzuna(driver=None):
     queries.append({"what": "qa Haifa", "where": "Israel"})
     queries.append({"what": "devops Haifa", "where": "Israel"})
 
-    # Try one simple query first - save response for debugging
-    try:
-        test_url = f"https://api.adzuna.com/v1/api/jobs/il/search/1?app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}&what=software&content-type=application/json&results_per_page=3"
-        req = urllib.request.Request(test_url, headers={"User-Agent": "Mozilla/5.0"})
-        resp = urllib.request.urlopen(req, timeout=15)
-        raw = resp.read().decode()
-        with open(os.path.join(OUT_DIR, "debug_adzuna.json"), "w", encoding="utf-8") as f:
-            f.write(raw)
-    except Exception as e:
-        with open(os.path.join(OUT_DIR, "debug_adzuna.txt"), "w", encoding="utf-8") as f:
-            f.write(f"Adzuna API error: {e}")
+    # Try few simple queries first - test which country code works
+    for test_cc in ["gb", "ae", "au", "ie", "nl", "fr", "de", "ca", "us", "pl", "za", "sg", "in", "br", "il"]:
+        try:
+            test_url = f"https://api.adzuna.com/v1/api/jobs/{test_cc}/search/1?app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}&what=software&content-type=application/json&results_per_page=1"
+            req = urllib.request.Request(test_url, headers={"User-Agent": "Mozilla/5.0"})
+            resp = urllib.request.urlopen(req, timeout=10)
+            raw = resp.read().decode()
+            with open(os.path.join(OUT_DIR, f"debug_adzuna_{test_cc}.json"), "w", encoding="utf-8") as f:
+                f.write(raw)
+            print(f"  Adzuna test: {test_cc} OK ({resp.status})")
+        except Exception as e:
+            with open(os.path.join(OUT_DIR, f"debug_adzuna_{test_cc}.txt"), "w", encoding="utf-8") as f:
+                f.write(f"Adzuna {test_cc}: {e}")
 
     for q in queries[:30]:  # limit to 30 queries
         what = urllib.parse.quote(q["what"])
