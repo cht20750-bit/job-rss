@@ -1,4 +1,6 @@
 name: Job RSS Scraper
+permissions:
+  contents: write
 on:
   schedule:
     - cron: "30 7 * * *"

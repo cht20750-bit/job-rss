@@ -49,6 +49,9 @@ TECH_KEYWORDS = [
     "scrum", "agile", "project manager", "pmo"
 ]
 
+DEBUG_DIR = os.path.join(OUT_DIR, "debug")
+os.makedirs(DEBUG_DIR, exist_ok=True)
+
 def get_driver():
     opts = Options()
     opts.add_argument("--headless=new")
@@ -60,8 +63,12 @@ def get_driver():
     opts.add_argument("--lang=he-IL")
     opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("useAutomationExtension", False)
+    opts.page_load_strategy = 'normal'
     service = Service(ChromeDriverManager().install())
-    return webdriver.Chrome(service=service, options=opts)
+    d = webdriver.Chrome(service=service, options=opts)
+    d.set_page_load_timeout(45)
+    d.set_script_timeout(30)
+    return d
 
 def is_north(text):
     if not text: return False
@@ -88,6 +95,15 @@ def safe_find(el, by, value):
 def safe_finds(el, by, value):
     try: return el.find_elements(by, value)
     except: return []
+
+def dump_debug(driver, name):
+    try:
+        html = driver.page_source[:200000]
+        with open(os.path.join(DEBUG_DIR, f"{name}.html"), "w", encoding="utf-8") as f:
+            f.write(html)
+        print(f"  DEBUG: {name}.html saved ({len(html)} chars)")
+    except Exception as e:
+        print(f"  DEBUG dump error: {e}")
 
 def wait_for(driver, by, value, timeout=10):
     try: WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by, value)))
@@ -647,6 +663,55 @@ def parse_hever(driver):
     return jobs
 
 
+def try_generic(driver, source_name):
+    """Generic heuristic: find any text that looks like a job listing"""
+    jobs = []
+    # Try multiple selectors
+    candidates = []
+    for sel in ["article", ".job", ".card", ".item", ".listing", ".result",
+                "li[class]", "[class*=job]", "[class*=Job]", "[class*=vacancy]",
+                "[class*=position]", "[class*=Position]", "tr[class]"]:
+        candidates = safe_finds(driver, By.CSS_SELECTOR, sel)
+        if candidates:
+            break
+    if not candidates:
+        # Fallback: extract all links
+        links = safe_finds(driver, By.CSS_SELECTOR, "a[href]")
+        for link in links:
+            href = link.get_attribute("href") or ""
+            text = link.text.strip()
+            if not text or len(text) < 5 or len(text) > 200:
+                continue
+            if any(s in href.lower() for s in ["/job", "/position", "/vacancy", "/משרה", "/דרוש"]):
+                desc = ""
+                try:
+                    parent = link.find_element(By.XPATH, "..")
+                    desc = parent.text[:300]
+                except: pass
+                if is_tech(text) or is_tech(desc):
+                    jobs.append({"title": text, "url": href, "company": "", "location": "",
+                                 "description": desc, "source": source_name})
+        return jobs
+
+    for item in candidates:
+        title_el = (safe_find(item, By.TAG_NAME, "h2") or safe_find(item, By.TAG_NAME, "h3")
+                    or safe_find(item, By.TAG_NAME, "h4") or safe_find(item, By.CSS_SELECTOR, "[class*=title]")
+                    or safe_find(item, By.TAG_NAME, "a"))
+        if not title_el: continue
+        title = title_el.text.strip()
+        if not title or len(title) < 5 or len(title) > 200: continue
+        url = (title_el.get_attribute("href") if title_el.tag_name == "a"
+               else (safe_find(item, By.TAG_NAME, "a").get_attribute("href") if safe_find(item, By.TAG_NAME, "a") else ""))
+        comp_el = safe_find(item, By.CSS_SELECTOR, "[class*=company], [class*=Company]")
+        company = comp_el.text.strip() if comp_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, "[class*=location], [class*=Location], [class*=city], [class*=City]")
+        location = loc_el.text.strip() if loc_el else ""
+        desc = item.text[:300]
+        if is_tech(title) or is_tech(desc):
+            jobs.append({"title": title, "url": url, "company": company, "location": location,
+                         "description": desc, "source": source_name})
+    return jobs
+
 # ============================================================
 # SOURCE REGISTRY
 # ============================================================
@@ -744,15 +809,27 @@ def main():
         try:
             print(f"\n--- {name} ---")
             jobs = parser(driver)
-            for j in jobs:
-                if not is_tech(j["title"]) and not is_tech(j.get("description", "")):
-                    continue
+            jobs = [j for j in jobs if is_tech(j["title"]) or is_tech(j.get("description", ""))]
+            if not jobs:
+                dump_debug(driver, name)
+                jobs = try_generic(driver, name)
+                if jobs:
+                    print(f"  GENERIC fallback: {len(jobs)} jobs")
             all_jobs.extend(jobs)
         except WebDriverException as e:
-            print(f"  ERROR: {str(e)[:100]}")
+            msg = str(e)[:100]
+            print(f"  ERROR: {msg}")
+            try:
+                dump_debug(driver, name)
+                jobs = try_generic(driver, name)
+                if jobs:
+                    print(f"  GENERIC fallback: {len(jobs)} jobs")
+                    all_jobs.extend(jobs)
+            except: pass
         except Exception as e:
-            print(f"  ERROR: {str(e)[:100]}")
-
+            msg = str(e)[:100]
+            print(f"  ERROR: {msg}")
+ 
     driver.quit()
 
     print(f"\n=== Total: {len(all_jobs)} jobs from {len(sources_to_run)} sources ===")
