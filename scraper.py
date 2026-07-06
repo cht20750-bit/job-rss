@@ -965,6 +965,18 @@ def parse_adzuna(driver=None):
     queries.append({"what": "qa Haifa", "where": "Israel"})
     queries.append({"what": "devops Haifa", "where": "Israel"})
 
+    # Try one simple query first - save response for debugging
+    try:
+        test_url = f"https://api.adzuna.com/v1/api/jobs/il/search/1?app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}&what=software&content-type=application/json&results_per_page=3"
+        req = urllib.request.Request(test_url, headers={"User-Agent": "Mozilla/5.0"})
+        resp = urllib.request.urlopen(req, timeout=15)
+        raw = resp.read().decode()
+        with open(os.path.join(OUT_DIR, "debug_adzuna.json"), "w", encoding="utf-8") as f:
+            f.write(raw)
+    except Exception as e:
+        with open(os.path.join(OUT_DIR, "debug_adzuna.txt"), "w", encoding="utf-8") as f:
+            f.write(f"Adzuna API error: {e}")
+
     for q in queries[:30]:  # limit to 30 queries
         what = urllib.parse.quote(q["what"])
         where = urllib.parse.quote(q["where"])
@@ -976,12 +988,7 @@ def parse_adzuna(driver=None):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             resp = urllib.request.urlopen(req, timeout=15)
-            raw = resp.read().decode()
-            # Save first query response for debugging
-            if q == {"what": "software developer", "where": "Haifa"}:
-                with open(os.path.join(OUT_DIR, "debug_adzuna.json"), "w", encoding="utf-8") as f:
-                    f.write(raw)
-            data = json.loads(raw)
+            data = json.loads(resp.read().decode())
             for item in data.get("results", []):
                 title = item.get("title", "").strip()
                 if not title: continue
@@ -998,8 +1005,7 @@ def parse_adzuna(driver=None):
                                  "company": company, "location": location, "description": desc,
                                  "source": "Adzuna"})
         except Exception as e:
-            print(f"  Adzuna query error ({q}): {e}")
-    print(f"  Adzuna: {len(jobs)} jobs (from {len(queries)} queries)")
+            pass
     return jobs
 
 
