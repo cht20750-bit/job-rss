@@ -1,35 +1,17 @@
 name: Daily Job Scraper
-
-on:
-  schedule:
-    - cron: '30 7 * * *'
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
+on: workflow_dispatch
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
-      
       - run: pip install -r requirements.txt
-      
-      - name: Run scraper
-        run: python scraper.py
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Commit & Push RSS
-        run: |
+      - run: python scraper.py
+      - run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add docs/
-          git commit -m "Update RSS feed [skip ci]" || echo "No changes"
-          git push
+          git diff --cached --quiet || (git commit -m "Update RSS [skip ci]" && git push)
