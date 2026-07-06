@@ -2,8 +2,11 @@ name: Daily Job Scraper
 
 on:
   schedule:
-    - cron: '30 7 * * *'  # 9:30 Israel time (UTC+2)
-  workflow_dispatch:  # manual trigger
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   scrape:
@@ -23,9 +26,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-          keep_files: false
+      - name: Commit & Push RSS
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add docs/
+          git commit -m "Update RSS feed [skip ci]" || echo "No changes"
+          git push
