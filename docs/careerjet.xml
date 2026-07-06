@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>משרות הייטק - חיפה וצפון</title>
+    <link>https://cht20750-bit.github.io/job-rss/</link>
+    <description>משרות טכנולוגיה בצפון ישראל - איסוף אוטומטי ממגוון מקורות</description>
+    <language>he-IL</language>
+    <lastBuildDate>Mon, 06 Jul 2026 06:07:52 +0000</lastBuildDate>
+    <item>
+      <title>Post Silicon Validation Student</title>
+      <link>https://www.careerjet.co.il/jobad/il9972cd6c54461220bf606797a3eba12e</link>
+      <guid isPermaLink="false">0001ee355630</guid>
+      <description><![CDATA[Post Silicon Validation Student
+Intel
+חיפה
+Job Details: Job Description: The Role and Impact Are you ready to contribute to the future of computing at Intel? As a Silicon Validation Engineering Intern, you will play a pivotal role in ensurin…
+לפני 20 דקות]]></description>
+      <company>Intel</company>
+      <location>חיפה</location>
+      <source>CareerJet</source>
+      <pubDate>Mon, 06 Jul 2026 06:07:52 +0000</pubDate>
+    </item>
+    <item>
+      <title>Growth Product Analyst - Monday CRM</title>
+      <link>https://www.careerjet.co.il/jobad/il4d96f0ae46bb5b9264224d2de46128d7</link>
+      <guid isPermaLink="false">52d3e5958b96</guid>
+      <description><![CDATA[Growth Product Analyst - Monday CRM
+monday.com
+תל אביב
+Growth Product Analyst - monday CRM is the AI work platform powering the most ambitious teams. Over 250,000 customers across departments use us to bring people, workflows, and AI agents together on …
+לפני שעתיים]]></description>
+      <company>monday.com</company>
+      <location>תל אביב</location>
+      <source>CareerJet</source>
+      <pubDate>Mon, 06 Jul 2026 06:07:52 +0000</pubDate>
+    </item>
+  </channel>
+</rss>
