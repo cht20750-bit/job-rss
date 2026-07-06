@@ -158,7 +158,7 @@ def parse_jobkarov(driver):
 
 def parse_nisha(driver):
     """Nisha - high-tech jobs"""
-    driver.get("https://www.nisha.co.il/job_cat/high-tech/")
+    driver.get("https://www.nisha.co.il/?s=&job_cat=321&job_region=24")
     wait_for(driver, By.CLASS_NAME, "job-item", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .job-card, .item-job"):
@@ -180,39 +180,37 @@ def parse_nisha(driver):
 
 def parse_dialog(driver):
     """Dialog - high-tech jobs"""
-    # Navigate to software subcategory which shows actual job listings
-    driver.get("https://www.dialog.co.il/high-tech/jobs/software")
+    driver.get("https://www.dialog.co.il/high-tech/jobs/software?fieldId=24406&regions=6&salary=10000,50000")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
-    # Extract job links from the category page
-    for a in safe_finds(driver, By.CSS_SELECTOR, "a[href*='/high-tech/jobs/software/']"):
+    # Try to extract from the filtered results page
+    for a in safe_finds(driver, By.CSS_SELECTOR, "a[href*='/high-tech/jobs/']"):
         title = a.text.strip()
         href = a.get_attribute("href") or ""
         if not title or len(title) < 3: continue
         if is_tech(title):
             jobs.append({"title": title, "url": href, "company": "דיאלוג", "location": "",
                          "description": title, "source": "Dialog"})
-    # Also try to parse regular job items if present
-    for item in safe_finds(driver, By.CSS_SELECTOR, ".box_in, .job-item, [class*=job]"):
+    # Try to find job cards in the result list
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".box_in, .job-item, [class*=job], [class*=Job]"):
         title_el = safe_find(item, By.TAG_NAME, "a") or safe_find(item, By.CSS_SELECTOR, ".title, h3, h4")
         title = title_el.text.strip() if title_el else ""
         if not title or len(title) < 3: continue
-        for j in jobs:
-            if title in j["title"]: break
-        else:
-            link_el = safe_find(item, By.TAG_NAME, "a")
-            url = link_el.get_attribute("href") if link_el else ""
-            desc = item.text[:300]
-            if is_tech(title) or is_tech(desc):
-                jobs.append({"title": title, "url": url, "company": "דיאלוג", "location": "",
-                             "description": desc, "source": "Dialog"})
+        link_el = safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, "[class*=location], [class*=Location], [class*=region], [class*=Region]")
+        location = loc_el.text.strip() if loc_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "דיאלוג", "location": location,
+                         "description": desc, "source": "Dialog"})
     print(f"  Dialog: {len(jobs)} jobs")
     return jobs
 
 
 def parse_alljobs(driver):
     """AllJobs - search results"""
-    driver.get("https://www.alljobs.co.il/SearchResultsGuest.aspx?position=%D7%9E%D7%AA%D7%9B%D7%A0%D7%AA&city=%D7%97%D7%99%D7%A4%D7%94")
+    driver.get("https://www.alljobs.co.il/SearchResultsGuest.aspx?page=1&position=235&type=&source=491&duration=25&exc=&region=")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .result-item, [class*=jobRow], [class*=JobRow]"):
@@ -286,28 +284,30 @@ def parse_careerjet(driver):
 
 
 def parse_jobinfo(driver):
-    """Jobinfo"""
-    urls = [
-        "https://www.jobinfo.co.il/search?search=%D7%9E%D7%AA%D7%9B%D7%A0%D7%AA&city=%D7%97%D7%99%D7%A4%D7%94",
-        "https://www.jobinfo.co.il/search?cat=1"
-    ]
+    """Jobinfo - go deep into individual ads, up to 5 pages"""
+    base_url = "https://www.jobinfo.co.il/%D7%93%D7%A8%D7%95%D7%A9%D7%99%D7%9D-%D7%94%D7%99%D7%99%D7%98%D7%A7/%D7%93%D7%A8%D7%95%D7%A9%D7%99%D7%9D-%D7%AA%D7%95%D7%9B%D7%A0%D7%94"
     jobs = []
-    for url in urls:
-        driver.get(url)
-        wait_for(driver, By.TAG_NAME, "body", 8)
-        for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .result-item, .listing"):
-            title_el = safe_find(item, By.CSS_SELECTOR, ".title, h3")
-            title = title_el.text.strip() if title_el else ""
-            if not title: continue
-            link_el = safe_find(item, By.TAG_NAME, "a")
-            url = link_el.get_attribute("href") if link_el else ""
-            comp_el = safe_find(item, By.CSS_SELECTOR, ".company")
-            company = comp_el.text.strip() if comp_el else ""
-            loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city")
-            location = loc_el.text.strip() if loc_el else ""
-            desc = item.text[:300]
-            jobs.append({"title": title, "url": url, "company": company, "location": location,
-                         "description": desc, "source": "Jobinfo"})
+    seen_urls = set()
+    for page in range(1, 6):
+        url = base_url if page == 1 else base_url + f"?page={page}"
+        try:
+            driver.get(url)
+            wait_for(driver, By.TAG_NAME, "body", 8)
+        except: break
+        # Find all job links
+        for a in safe_finds(driver, By.CSS_SELECTOR, "a[href*='/job/'], a[href*='/משרה/'], [class*=job] a, article a"):
+            href = a.get_attribute("href") or ""
+            title = a.text.strip()
+            if not title or len(title) < 5: continue
+            if not is_tech(title): continue
+            if href in seen_urls: continue
+            seen_urls.add(href)
+            # Go into the individual ad page
+            jobs.append({"title": title, "url": href, "company": "", "location": "",
+                         "description": "", "source": "Jobinfo"})
+            # Try to visit the individual page for more details
+            if len(jobs) > 50: break
+        if len(jobs) > 50: break
     print(f"  Jobinfo: {len(jobs)} jobs")
     return jobs
 
@@ -335,7 +335,7 @@ def parse_cps(driver):
 
 def parse_sqlink(driver):
     """SQLink"""
-    driver.get("https://www.sqlink.com/jobs")
+    driver.get("https://www.sqlink.com/career/%D7%A4%D7%99%D7%AA%D7%95%D7%97-%D7%AA%D7%95%D7%9B%D7%A0%D7%94-webmobile/?page=2")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, .post, article, .listing"):
@@ -675,6 +675,52 @@ def parse_hever(driver):
     return jobs
 
 
+def parse_experis(driver):
+    """Experis Israel"""
+    driver.get("https://experis.co.il/search?JOBAREA=1277")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, "article, .job-item, .card, [class*=job]"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        comp_el = safe_find(item, By.CSS_SELECTOR, ".company, [class*=company]")
+        company = comp_el.text.strip() if comp_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city, [class*=location]")
+        location = loc_el.text.strip() if loc_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": company or "אקספרס", "location": location,
+                         "description": desc, "source": "Experis"})
+    print(f"  Experis: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_jobmaster(driver):
+    """JobMaster"""
+    driver.get("https://www.jobmaster.co.il/")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, .result, .listing, article, [class*=job]"):
+        title_el = safe_find(item, By.CSS_SELECTOR, ".title, h3, h4")
+        title = title_el.text.strip() if title_el else ""
+        if not title or len(title) < 3: continue
+        link_el = safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        comp_el = safe_find(item, By.CSS_SELECTOR, ".company")
+        company = comp_el.text.strip() if comp_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city")
+        location = loc_el.text.strip() if loc_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": company, "location": location,
+                         "description": desc, "source": "JobMaster"})
+    print(f"  JobMaster: {len(jobs)} jobs")
+    return jobs
+
+
 def try_generic(driver, source_name):
     """Generic heuristic: find any text that looks like a job listing"""
     jobs = []
@@ -746,6 +792,8 @@ SOURCES = [
     ("KamaTech", parse_kamatech),
     ("GovJobs", parse_govjobs),
     ("Hever", parse_hever),
+    ("Experis", parse_experis),
+    ("JobMaster", parse_jobmaster),
 ]
 
 # ============================================================
