@@ -700,7 +700,7 @@ def parse_experis(driver):
 
 def parse_jobmaster(driver):
     """JobMaster"""
-    driver.get("https://www.jobmaster.co.il/")
+    driver.get("https://www.jobmaster.co.il/jobs/?q=%D7%AA%D7%95%D7%9B%D7%A0%D7%94&l=%D7%97%D7%99%D7%A4%D7%94&headcatnum=15")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, .result, .listing, article, [class*=job]"):
@@ -724,6 +724,7 @@ def parse_jobmaster(driver):
 def try_generic(driver, source_name):
     """Generic heuristic: find any text that looks like a job listing"""
     jobs = []
+    seen_urls = set()
     # Try multiple selectors
     candidates = []
     for sel in ["article", ".job", ".card", ".item", ".listing", ".result",
@@ -737,6 +738,8 @@ def try_generic(driver, source_name):
         links = safe_finds(driver, By.CSS_SELECTOR, "a[href]")
         for link in links:
             href = link.get_attribute("href") or ""
+            if href in seen_urls: continue
+            seen_urls.add(href)
             text = link.text.strip()
             if not text or len(text) < 5 or len(text) > 200:
                 continue
@@ -760,6 +763,8 @@ def try_generic(driver, source_name):
         if not title or len(title) < 5 or len(title) > 200: continue
         url = (title_el.get_attribute("href") if title_el.tag_name == "a"
                else (safe_find(item, By.TAG_NAME, "a").get_attribute("href") if safe_find(item, By.TAG_NAME, "a") else ""))
+        if url and url in seen_urls: continue
+        if url: seen_urls.add(url)
         comp_el = safe_find(item, By.CSS_SELECTOR, "[class*=company], [class*=Company]")
         company = comp_el.text.strip() if comp_el else ""
         loc_el = safe_find(item, By.CSS_SELECTOR, "[class*=location], [class*=Location], [class*=city], [class*=City]")
@@ -865,16 +870,22 @@ def main():
             return
 
     print(f"Running {len(sources_to_run)} sources...")
+    all_seen_ids = set()
     for name, parser in sources_to_run:
         try:
             print(f"\n--- {name} ---")
             jobs = parser(driver)
+            jobs = [j for j in jobs if is_tech(j["title"])]
             if not jobs:
                 dump_debug(driver, name)
                 jobs = try_generic(driver, name)
                 if jobs:
                     print(f"  GENERIC fallback: {len(jobs)} jobs")
-            all_jobs.extend(jobs)
+            for j in jobs:
+                jid = job_id(j)
+                if jid not in all_seen_ids:
+                    all_seen_ids.add(jid)
+                    all_jobs.append(j)
         except WebDriverException as e:
             msg = str(e)[:100]
             print(f"  ERROR: {msg}")
