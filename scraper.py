@@ -976,7 +976,12 @@ def parse_adzuna(driver=None):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             resp = urllib.request.urlopen(req, timeout=15)
-            data = json.loads(resp.read().decode())
+            raw = resp.read().decode()
+            # Save first query response for debugging
+            if q == {"what": "software developer", "where": "Haifa"}:
+                with open(os.path.join(OUT_DIR, "debug_adzuna.json"), "w", encoding="utf-8") as f:
+                    f.write(raw)
+            data = json.loads(raw)
             for item in data.get("results", []):
                 title = item.get("title", "").strip()
                 if not title: continue
@@ -993,7 +998,7 @@ def parse_adzuna(driver=None):
                                  "company": company, "location": location, "description": desc,
                                  "source": "Adzuna"})
         except Exception as e:
-            print(f"  Adzuna query error: {e}")
+            print(f"  Adzuna query error ({q}): {e}")
     print(f"  Adzuna: {len(jobs)} jobs (from {len(queries)} queries)")
     return jobs
 
