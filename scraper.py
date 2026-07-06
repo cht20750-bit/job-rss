@@ -136,8 +136,7 @@ def parse_geektime(driver):
 
 def parse_jobkarov(driver):
     """JobKarov - Search page"""
-    # URL may redirect from GitHub, try direct Search
-    driver.get("https://www.jobkarov.com/Search/")
+    driver.get("https://www.jobkarov.com/Search/?speciality=2119&area=16%2C17%2C20")
     wait_for(driver, By.CLASS_NAME, "job-item", 8)
     jobs = []
     for item in safe_finds(driver, By.CLASS_NAME, "job-item"):
