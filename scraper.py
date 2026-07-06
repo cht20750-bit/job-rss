@@ -1,4 +1,4 @@
-import os, sys, json, time, re, hashlib, urllib.request, urllib.parse
+import os, sys, json, time, re, hashlib, urllib.request
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape
 
@@ -936,78 +936,127 @@ def parse_apple(driver):
     return jobs
 
 
-ADZUNA_ID = os.environ.get("ADZUNA_ID", "89fc5699")
-ADZUNA_KEY = os.environ.get("ADZUNA_KEY", "a418d498078a17504f42e30822a1ed8a")
-
-def parse_adzuna(driver=None):
-    """Adzuna API - tech jobs in north Israel, no Selenium needed.
-    Covers jobs from Indeed, AllJobs, CareerJet, JobMaster, Drushim, etc."""
+def parse_malam(driver):
+    """Malam Team - Israeli IT services with Haifa jobs"""
     jobs = []
-    seen = set()
+    try:
+        driver.get("https://www.malamteam.com/careers/")
+        time.sleep(3)
+        items = driver.find_elements(By.CSS_SELECTOR, "a[href*='job'], .job-item, .career-item, tr")
+        for el in items[:30]:
+            text = el.text.strip()
+            if not text or len(text) < 10: continue
+            href = ""
+            try: href = el.get_attribute("href")
+            except: pass
+            title = text.split("\n")[0][:80]
+            jobs.append({"title": title, "id": hashlib.md5(title.encode()).hexdigest()[:12],
+                         "url": href or "", "company": "Malam Team",
+                         "location": "חיפה", "description": text[:200], "source": "MalamTeam"})
+    except Exception as e:
+        print(f"  Malam error: {e}")
+    if not jobs:
+        jobs = try_generic(driver, "MalamTeam")
+    print(f"  MalamTeam: {len(jobs)} jobs")
+    return jobs
 
-    cities = ["Haifa", "Karmiel", "Nazareth", "Yokneam", "Afula", "Tiberias",
-              "Nahariya", "Akko", "Kiryat+Shmona", "Safed", "Kiryat+Motzkin",
-              "Kiryat+Bialik", "Kiryat+Yam", "Kiryat+Ata", "Nesher",
-              "Zikhron+Yaakov", "Hadera", "Pardes+Hanna", "Or+Akiva"]
-    keywords = ["software", "developer", "engineer", "qa", "devops", "data",
-                "full+stack", "backend", "frontend", "programmer", "web",
-                "cyber", "security", "cloud", "ai", "ml", "product+manager",
-                "ux", "ui", "analyst", "embedded", "support", "it"]
 
-    # Multiple query combinations to maximize coverage
-    queries = []
-    for city in cities:
-        queries.append({"what": "software developer", "where": city})
-        queries.append({"what": "engineer", "where": city})
-    # Also search without city for broader results
-    queries.append({"what": "software Haifa", "where": "Israel"})
-    queries.append({"what": "developer Haifa", "where": "Israel"})
-    queries.append({"what": "qa Haifa", "where": "Israel"})
-    queries.append({"what": "devops Haifa", "where": "Israel"})
+def parse_danel(driver):
+    """Danel HR - Israeli HR company job board"""
+    jobs = []
+    try:
+        driver.get("https://www.danel-jobs.co.il/")
+        time.sleep(3)
+        items = driver.find_elements(By.CSS_SELECTOR, "a[href*='job'], .job-card, .position, article")
+        for el in items[:30]:
+            text = el.text.strip()
+            if not text or len(text) < 10: continue
+            href = ""
+            try: href = el.get_attribute("href")
+            except: pass
+            title = text.split("\n")[0][:80]
+            jobs.append({"title": title, "id": hashlib.md5(text.encode()).hexdigest()[:12],
+                         "url": href or "", "company": "דנאל",
+                         "location": "", "description": text[:200], "source": "Danel"})
+    except Exception as e:
+        print(f"  Danel error: {e}")
+    if not jobs:
+        jobs = try_generic(driver, "Danel")
+    print(f"  Danel: {len(jobs)} jobs")
+    return jobs
 
-    # Try few simple queries first - test which country code works
-    for test_cc in ["gb", "ae", "au", "ie", "nl", "fr", "de", "ca", "us", "pl", "za", "sg", "in", "br", "il"]:
-        try:
-            test_url = f"https://api.adzuna.com/v1/api/jobs/{test_cc}/search/1?app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}&what=software&content-type=application/json&results_per_page=1"
-            req = urllib.request.Request(test_url, headers={"User-Agent": "Mozilla/5.0"})
-            resp = urllib.request.urlopen(req, timeout=10)
-            raw = resp.read().decode()
-            with open(os.path.join(OUT_DIR, f"debug_adzuna_{test_cc}.json"), "w", encoding="utf-8") as f:
-                f.write(raw)
-            print(f"  Adzuna test: {test_cc} OK ({resp.status})")
-        except Exception as e:
-            with open(os.path.join(OUT_DIR, f"debug_adzuna_{test_cc}.txt"), "w", encoding="utf-8") as f:
-                f.write(f"Adzuna {test_cc}: {e}")
 
-    for q in queries[:30]:  # limit to 30 queries
-        what = urllib.parse.quote(q["what"])
-        where = urllib.parse.quote(q["where"])
-        url = (f"https://api.adzuna.com/v1/api/jobs/il/search/1?"
-               f"app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}"
-               f"&what={what}&where={where}&category=it-jobs"
-               f"&content-type=application/json&results_per_page=50"
-               f"&sort_by=date")
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            resp = urllib.request.urlopen(req, timeout=15)
-            data = json.loads(resp.read().decode())
-            for item in data.get("results", []):
-                title = item.get("title", "").strip()
-                if not title: continue
-                jid = item.get("id", "") or hashlib.md5(title.encode()).hexdigest()[:8]
-                if jid in seen: continue
-                seen.add(jid)
-                company = ""
-                co = item.get("company")
-                if co: company = co.get("display_name", "")
-                location = item.get("location", {}).get("display_name", "")
-                desc = item.get("description", "")[:300]
-                if is_tech(title):
-                    jobs.append({"title": title, "id": jid, "url": item.get("redirect_url", ""),
-                                 "company": company, "location": location, "description": desc,
-                                 "source": "Adzuna"})
-        except Exception as e:
-            pass
+def parse_ness(driver):
+    """Ness Technologies - Israeli IT services"""
+    jobs = []
+    try:
+        driver.get("https://www.ness-tech.co.il/careers/")
+        time.sleep(3)
+        items = driver.find_elements(By.CSS_SELECTOR, "a[href*='job'], .job-item, .career-item, article")
+        for el in items[:30]:
+            text = el.text.strip()
+            if not text or len(text) < 10: continue
+            href = ""
+            try: href = el.get_attribute("href")
+            except: pass
+            title = text.split("\n")[0][:80]
+            jobs.append({"title": title, "id": hashlib.md5(text.encode()).hexdigest()[:12],
+                         "url": href or "", "company": "Ness Technologies",
+                         "location": "", "description": text[:200], "source": "Ness"})
+    except Exception as e:
+        print(f"  Ness error: {e}")
+    if not jobs:
+        jobs = try_generic(driver, "Ness")
+    print(f"  Ness: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_galilsoft(driver):
+    """Galil Software - software development in north"""
+    jobs = []
+    try:
+        driver.get("https://www.galilsoftware.com/careers/")
+        time.sleep(3)
+        items = driver.find_elements(By.CSS_SELECTOR, "a[href*='job'], .job-item, article, .position")
+        for el in items[:30]:
+            text = el.text.strip()
+            if not text or len(text) < 10: continue
+            href = ""
+            try: href = el.get_attribute("href")
+            except: pass
+            title = text.split("\n")[0][:80]
+            jobs.append({"title": title, "id": hashlib.md5(text.encode()).hexdigest()[:12],
+                         "url": href or "", "company": "Galil Software",
+                         "location": "", "description": text[:200], "source": "GalilSoft"})
+    except Exception as e:
+        print(f"  GalilSoft error: {e}")
+    if not jobs:
+        jobs = try_generic(driver, "GalilSoft")
+    print(f"  GalilSoft: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_hpe(driver):
+    """HPE - Hewlett Packard Enterprise careers"""
+    jobs = []
+    try:
+        driver.get("https://careers.hpe.com/us/en/search-results?q=Haifa")
+        time.sleep(5)
+        items = driver.find_elements(By.CSS_SELECTOR, "a[href*='job'], .job-title, article, li")
+        for el in items[:30]:
+            text = el.text.strip()
+            if not text or len(text) < 10: continue
+            href = ""
+            try: href = el.get_attribute("href")
+            except: pass
+            if not href: continue
+            title = text.split("\n")[0][:80]
+            jobs.append({"title": title, "id": hashlib.md5(text.encode()).hexdigest()[:12],
+                         "url": href, "company": "HPE",
+                         "location": "Haifa", "description": text[:200], "source": "HPE"})
+    except Exception as e:
+        print(f"  HPE error: {e}")
+    print(f"  HPE: {len(jobs)} jobs")
     return jobs
 
 
@@ -1108,8 +1157,11 @@ SOURCES = [
     ("Intel", parse_intel),
     ("CheckPoint", parse_checkpoint),
     ("Apple", parse_apple),
-    # API-based (no Selenium needed)
-    ("Adzuna", parse_adzuna),
+    ("MalamTeam", parse_malam),
+    ("Danel", parse_danel),
+    ("Ness", parse_ness),
+    ("GalilSoft", parse_galilsoft),
+    ("HPE", parse_hpe),
 ]
 
 # ============================================================
@@ -1166,7 +1218,7 @@ def write_rss(rss, filename="rss.xml"):
 # ============================================================
 # MAIN
 # ============================================================
-API_SOURCES = {"Adzuna"}
+API_SOURCES = set()
 
 def main():
     driver = None
