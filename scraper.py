@@ -139,7 +139,8 @@ def parse_geektime(driver):
 
 def parse_jobkarov(driver):
     """JobKarov - Search page"""
-    driver.get("https://www.jobkarov.com/Search/?area=16")
+    # URL may redirect from GitHub, try direct Search
+    driver.get("https://www.jobkarov.com/Search/")
     wait_for(driver, By.CLASS_NAME, "job-item", 8)
     jobs = []
     for item in safe_finds(driver, By.CLASS_NAME, "job-item"):
@@ -183,26 +184,39 @@ def parse_nisha(driver):
 
 def parse_dialog(driver):
     """Dialog - high-tech jobs"""
-    driver.get("https://www.dialog.co.il/high-tech/jobs/")
+    # Navigate to software subcategory which shows actual job listings
+    driver.get("https://www.dialog.co.il/high-tech/jobs/software")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
-    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .job-card, [class*=job], [class*=position]"):
-        title_el = safe_find(item, By.CSS_SELECTOR, ".title, h3, h4")
+    # Extract job links from the category page
+    for a in safe_finds(driver, By.CSS_SELECTOR, "a[href*='/high-tech/jobs/software/']"):
+        title = a.text.strip()
+        href = a.get_attribute("href") or ""
+        if not title or len(title) < 3: continue
+        if is_tech(title):
+            jobs.append({"title": title, "url": href, "company": "דיאלוג", "location": "",
+                         "description": title, "source": "Dialog"})
+    # Also try to parse regular job items if present
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".box_in, .job-item, [class*=job]"):
+        title_el = safe_find(item, By.TAG_NAME, "a") or safe_find(item, By.CSS_SELECTOR, ".title, h3, h4")
         title = title_el.text.strip() if title_el else ""
-        if not title: continue
-        link_el = safe_find(item, By.TAG_NAME, "a")
-        url = link_el.get_attribute("href") if link_el else ""
-        desc = item.text[:300]
-        if is_tech(title) or is_tech(desc):
-            jobs.append({"title": title, "url": url, "company": "דיאלוג", "location": "",
-                         "description": desc, "source": "Dialog"})
+        if not title or len(title) < 3: continue
+        for j in jobs:
+            if title in j["title"]: break
+        else:
+            link_el = safe_find(item, By.TAG_NAME, "a")
+            url = link_el.get_attribute("href") if link_el else ""
+            desc = item.text[:300]
+            if is_tech(title) or is_tech(desc):
+                jobs.append({"title": title, "url": url, "company": "דיאלוג", "location": "",
+                             "description": desc, "source": "Dialog"})
     print(f"  Dialog: {len(jobs)} jobs")
     return jobs
 
 
 def parse_alljobs(driver):
     """AllJobs - search results"""
-    driver.get("https://www.alljobs.co.il/SearchResultsGuest.aspx?position=%D7%9E%D7%AA%D7%9B%D7%A0%D7%AA&type=5")
+    driver.get("https://www.alljobs.co.il/SearchResultsGuest.aspx?position=%D7%9E%D7%AA%D7%9B%D7%A0%D7%AA&city=%D7%97%D7%99%D7%A4%D7%94")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .result-item, [class*=jobRow], [class*=JobRow]"):
@@ -304,10 +318,12 @@ def parse_jobinfo(driver):
 
 def parse_cps(driver):
     """CPS Jobs"""
-    driver.get("https://www.cps.co.il/search_page/")
+    if driver is None:
+        return []
+    driver.get("https://www.cps.co.il/search_page/?free_text=%D7%9E%D7%AA%D7%9B%D7%A0%D7%AA")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
-    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, .post, article"):
+    for item in safe_finds(driver, By.CSS_SELECTOR, "article, .post, [class*=job], [class*=Job]"):
         title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title")
         title = title_el.text.strip() if title_el else ""
         if not title: continue
@@ -323,7 +339,7 @@ def parse_cps(driver):
 
 def parse_sqlink(driver):
     """SQLink"""
-    driver.get("https://www.sqlink.com/%D7%9E%D7%A9%D7%A8%D7%95%D7%AA-%D7%91%D7%94%D7%99%D7%99%D7%98%D7%A7/")
+    driver.get("https://www.sqlink.com/jobs")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, .post, article, .listing"):
@@ -527,7 +543,7 @@ def parse_experis(driver):
 
 def parse_manpower(driver):
     """Manpower"""
-    driver.get("https://www.manpower.co.il/search")
+    driver.get("https://www.manpower.co.il/search?JOBEXPERTISE=4000")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, .result, .listing"):
@@ -548,8 +564,8 @@ def parse_manpower(driver):
 
 
 def parse_geektime_careers(driver):
-    """Geektime careers section"""
-    driver.get("https://insider.geektime.co.il/careers/")
+    """Geektime insider - all articles (includes job posts)"""
+    driver.get("https://insider.geektime.co.il")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing"):
@@ -568,7 +584,7 @@ def parse_geektime_careers(driver):
 
 def parse_ethosia(driver):
     """Ethosia"""
-    driver.get("https://www.ethosia.co.il")
+    driver.get("https://www.ethosia.co.il/jobs")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing"):
@@ -587,7 +603,7 @@ def parse_ethosia(driver):
 
 def parse_yad2(driver):
     """Yad2 jobs"""
-    driver.get("https://www.yad2.co.il/vehicles/jobs")
+    driver.get("https://www.yad2.co.il/jobs?search=%D7%9E%D7%AA%D7%9B%D7%A0%D7%AA")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, .listing"):
@@ -646,7 +662,7 @@ def parse_govjobs(driver):
 
 def parse_hever(driver):
     """Hever High Tech"""
-    driver.get("https://www.hever.co.il")
+    driver.get("https://www.hever.co.il/jobs")
     wait_for(driver, By.TAG_NAME, "body", 8)
     jobs = []
     for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article"):
