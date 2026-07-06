@@ -1,4 +1,4 @@
-import os, sys, json, time, re, hashlib, urllib.request
+import os, sys, json, time, re, hashlib, urllib.request, urllib.parse
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape
 
@@ -966,8 +966,8 @@ def parse_adzuna(driver=None):
     queries.append({"what": "devops Haifa", "where": "Israel"})
 
     for q in queries[:30]:  # limit to 30 queries
-        what = q["what"]
-        where = q["where"]
+        what = urllib.parse.quote(q["what"])
+        where = urllib.parse.quote(q["where"])
         url = (f"https://api.adzuna.com/v1/api/jobs/il/search/1?"
                f"app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}"
                f"&what={what}&where={where}&category=it-jobs"
@@ -993,7 +993,7 @@ def parse_adzuna(driver=None):
                                  "company": company, "location": location, "description": desc,
                                  "source": "Adzuna"})
         except Exception as e:
-            pass
+            print(f"  Adzuna query error: {e}")
     print(f"  Adzuna: {len(jobs)} jobs (from {len(queries)} queries)")
     return jobs
 
