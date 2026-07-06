@@ -1,5 +1,8 @@
-name: Daily Job Scraper
-on: workflow_dispatch
+name: Job RSS Scraper
+on:
+  schedule:
+    - cron: '30 7 * * *'
+  workflow_dispatch:
 jobs:
   scrape:
     runs-on: ubuntu-latest
