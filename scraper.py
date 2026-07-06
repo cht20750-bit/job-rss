@@ -16,7 +16,7 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 NORTH_CITIES = [
     "חיפה", "קריות", "קריית", "נשר", "טירת כרמל", "רכסים", "עתלית",
-    "דלית אל-כרמל", "עספיא", "נצרת", "נצרת עילית", "נוף הגליל",
+    "דלית אל-כרמל", "עספיא", "נצרת", "נוף הגליל",
     "עכו", "נהריה", "קריית שמונה", "טבריה", "צפת", "כרמיאל",
     "מעלות", "שלומי", "חצור הגלילית", "ראש פינה", "כפר תבור", "יבנאל",
     "בית שאן", "עפולה", "מגדל העמק", "יקנעם", "קריית טבעון",
@@ -25,10 +25,7 @@ NORTH_CITIES = [
     "כפר יאסיף", "אבו סנאן", "ג'דיידה-מכר", "בענה", "כאבול",
     "טמרה", "סח'נין", "זכרון יעקב", "בנימינה", "אור עקיבא",
     "פרדס חנה", "כרכור", "חדרה", "כפר ורדים", "בית ג'ן", "חורפיש",
-    "פקיעין", "מעלות-תרשיחא", "הרצליה", "תל אביב", "רמת גן",
-    "גבעתיים", "ראשון לציון", "פתח תקווה", "נתניה", "אשדוד",
-    "באר שבע", "ירושלים", "מודיעין", "רחובות", "חולון", "בת ים",
-    "כפר סבא", "רעננה", "הוד השרון", "אלעד", "בית שמש"
+    "פקיעין", "מעלות-תרשיחא"
 ]
 
 TECH_KEYWORDS = [
@@ -723,7 +720,7 @@ def try_generic(driver, source_name):
         loc_el = safe_find(item, By.CSS_SELECTOR, "[class*=location], [class*=Location], [class*=city], [class*=City]")
         location = loc_el.text.strip() if loc_el else ""
         desc = item.text[:300]
-        if is_tech(title) or is_tech(desc):
+        if is_tech(title):
             jobs.append({"title": title, "url": url, "company": company, "location": location,
                          "description": desc, "source": source_name})
     return jobs
@@ -825,7 +822,6 @@ def main():
         try:
             print(f"\n--- {name} ---")
             jobs = parser(driver)
-            jobs = [j for j in jobs if is_tech(j["title"]) or is_tech(j.get("description", ""))]
             if not jobs:
                 dump_debug(driver, name)
                 jobs = try_generic(driver, name)
@@ -850,11 +846,10 @@ def main():
 
     print(f"\n=== Total: {len(all_jobs)} jobs from {len(sources_to_run)} sources ===")
 
-    # Filter: keep only north + tech
+    # Filter: keep only north + tech (tech keyword must be in TITLE)
     north_tech = []
     for j in all_jobs:
-        text = j["title"] + " " + j.get("description", "") + " " + j.get("location", "") + " " + j.get("company", "")
-        if is_north(text) and is_tech(text):
+        if is_tech(j["title"]) and is_north(j["title"] + " " + j.get("description", "") + " " + j.get("location", "") + " " + j.get("company", "")):
             north_tech.append(j)
 
     print(f"After north+tech filter: {len(north_tech)} jobs")
@@ -871,7 +866,7 @@ def main():
     for j in all_jobs:
         src_jobs.setdefault(j["source"], []).append(j)
     for src, sjobs in src_jobs.items():
-        st = [j for j in sjobs if is_north(j["title"] + " " + j.get("description","") + " " + j.get("location","")) and is_tech(j["title"] + " " + j.get("description",""))]
+        st = [j for j in sjobs if is_tech(j["title"]) and is_north(j["title"] + " " + j.get("description","") + " " + j.get("location",""))]
         if st:
             write_rss(build_rss(st), f"{src.lower()}.xml")
 
