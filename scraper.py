@@ -1,4 +1,4 @@
-import os, sys, json, time, re, hashlib
+import os, sys, json, time, re, hashlib, urllib.request
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape
 
@@ -374,28 +374,6 @@ def parse_gotfriends(driver):
     return jobs
 
 
-def parse_jobmaster(driver):
-    """JobMaster"""
-    driver.get("https://www.jobmaster.co.il/search/?q=%D7%9E%D7%AA%D7%9B%D7%A0%D7%AA&city=%D7%97%D7%99%D7%A4%D7%94")
-    wait_for(driver, By.TAG_NAME, "body", 8)
-    jobs = []
-    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, .result, .listing"):
-        title_el = safe_find(item, By.CSS_SELECTOR, ".title, h3")
-        title = title_el.text.strip() if title_el else ""
-        if not title: continue
-        link_el = safe_find(item, By.TAG_NAME, "a")
-        url = link_el.get_attribute("href") if link_el else ""
-        comp_el = safe_find(item, By.CSS_SELECTOR, ".company")
-        company = comp_el.text.strip() if comp_el else ""
-        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city")
-        location = loc_el.text.strip() if loc_el else ""
-        desc = item.text[:300]
-        jobs.append({"title": title, "url": url, "company": company, "location": location,
-                     "description": desc, "source": "JobMaster"})
-    print(f"  JobMaster: {len(jobs)} jobs")
-    return jobs
-
-
 def parse_drushim(driver):
     """Drushim - Haifa programmer search"""
     driver.get("https://www.drushim.co.il/jobs/search/%D7%9E%D7%AA%D7%9B%D7%A0%D7%AA/%D7%97%D7%99%D7%A4%D7%94/")
@@ -512,28 +490,6 @@ def parse_nortech(driver):
         jobs.append({"title": title, "url": url, "company": company, "location": location,
                      "description": desc, "source": "Nortech"})
     print(f"  Nortech: {len(jobs)} jobs")
-    return jobs
-
-
-def parse_experis(driver):
-    """Experis Israel"""
-    driver.get("https://www.experis.co.il")
-    wait_for(driver, By.TAG_NAME, "body", 8)
-    jobs = []
-    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article"):
-        title_el = safe_find(item, By.CSS_SELECTOR, ".title, h3")
-        title = title_el.text.strip() if title_el else ""
-        if not title: continue
-        link_el = safe_find(item, By.TAG_NAME, "a")
-        url = link_el.get_attribute("href") if link_el else ""
-        comp_el = safe_find(item, By.CSS_SELECTOR, ".company")
-        company = comp_el.text.strip() if comp_el else ""
-        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city")
-        location = loc_el.text.strip() if loc_el else ""
-        desc = item.text[:300]
-        jobs.append({"title": title, "url": url, "company": company, "location": location,
-                     "description": desc, "source": "Experis"})
-    print(f"  Experis: {len(jobs)} jobs")
     return jobs
 
 
@@ -721,6 +677,327 @@ def parse_jobmaster(driver):
     return jobs
 
 
+def parse_ortal(driver):
+    """Ortal HR - Haifa branch"""
+    driver.get("https://www.ortal-hr.co.il/jobs?branch=haifa")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing, [class*=job]"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city, [class*=location]")
+        location = loc_el.text.strip() if loc_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "אורטל", "location": location or "חיפה",
+                         "description": desc, "source": "Ortal"})
+    print(f"  Ortal: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_adecco(driver):
+    """Adecco Israel - tech jobs"""
+    driver.get("https://www.adecco.co.il/jobs")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing, [class*=job]"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city, [class*=location]")
+        location = loc_el.text.strip() if loc_el else ""
+        comp_el = safe_find(item, By.CSS_SELECTOR, ".company, [class*=company]")
+        company = comp_el.text.strip() if comp_el else ""
+        desc = item.text[:300]
+        if is_tech(title) or is_tech(desc):
+            jobs.append({"title": title, "url": url, "company": company or "Adecco", "location": location,
+                         "description": desc, "source": "Adecco"})
+    print(f"  Adecco: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_koren(driver):
+    """Koren - hardware and software engineering"""
+    driver.get("https://www.koren-tec.co.il/jobs/")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing, [class*=job]"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city, [class*=location]")
+        location = loc_el.text.strip() if loc_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "קורן", "location": location or "צפון",
+                         "description": desc, "source": "Koren"})
+    print(f"  Koren: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_matrix(driver):
+    """Matrix Global - Haifa careers"""
+    driver.get("https://www.matrix.co.il/careers/")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing, [class*=job]"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city, [class*=location]")
+        location = loc_el.text.strip() if loc_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "מטריקס", "location": location,
+                         "description": desc, "source": "Matrix"})
+    print(f"  Matrix: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_ldr(driver):
+    """LDR - high tech north placement"""
+    driver.get("https://www.ldr.co.il/")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing, [class*=job]"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "LDR", "location": "",
+                         "description": desc, "source": "LDR"})
+    print(f"  LDR: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_elbit(driver):
+    """Elbit Systems - Haifa - largest hi-tech employer in north"""
+    driver.get("https://elbitsystems.co.il/careers/")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing, [class*=job], .vacancy"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title], a")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = title_el if title_el.tag_name == "a" else safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city, [class*=location]")
+        location = loc_el.text.strip() if loc_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "אלביט", "location": location or "חיפה",
+                         "description": desc, "source": "Elbit"})
+    print(f"  Elbit: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_technion(driver):
+    """Technion careers"""
+    driver.get("https://www.technion.ac.il/משרות-פנויות/")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing, [class*=job], tr, .post"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title], a")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = title_el if title_el.tag_name == "a" else safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "הטכניון", "location": "חיפה",
+                         "description": desc, "source": "Technion"})
+    print(f"  Technion: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_rafael(driver):
+    """Rafael - Haifa and Karmiel"""
+    driver.get("https://www.rafael.co.il/careers/")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing, [class*=job]"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, ".location, .city, [class*=location]")
+        location = loc_el.text.strip() if loc_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "רפאל", "location": location or "חיפה",
+                         "description": desc, "source": "Rafael"})
+    print(f"  Rafael: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_wix(driver):
+    """Wix - Haifa office"""
+    driver.get("https://www.wix.com/careers/locations/haifa")
+    wait_for(driver, By.TAG_NAME, "body", 8)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, ".job-item, .card, article, .listing, [class*=job], [class*=position]"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, .title, [class*=title], a")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = title_el if title_el.tag_name == "a" else safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "Wix", "location": "חיפה",
+                         "description": desc, "source": "Wix"})
+    print(f"  Wix: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_intel(driver):
+    """Intel Haifa - Workday ATS"""
+    driver.get("https://jobs.intel.com/en/search-jobs/Haifa%2C%20Israel")
+    wait_for(driver, By.TAG_NAME, "body", 10)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, "[class*=job], [class*=Job], [class*=position], [class*=Position], article, .result"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, a, [class*=title], [class*=Title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = title_el if title_el.tag_name == "a" else safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "Intel", "location": "חיפה",
+                         "description": desc, "source": "Intel"})
+    if not jobs:
+        for a in safe_finds(driver, By.TAG_NAME, "a"):
+            href = a.get_attribute("href") or ""
+            if "/job/" in href.lower() or "/search-jobs/" in href.lower():
+                t = a.text.strip()
+                if t and len(t) > 5 and is_tech(t):
+                    jobs.append({"title": t, "url": href, "company": "Intel", "location": "חיפה",
+                                 "description": "", "source": "Intel"})
+    print(f"  Intel: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_checkpoint(driver):
+    """Check Point - Haifa"""
+    driver.get("https://careers.checkpoint.com/?q=Haifa")
+    wait_for(driver, By.TAG_NAME, "body", 10)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, "[class*=job], [class*=Job], article, .result, .position, .card"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, a, [class*=title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = title_el if title_el.tag_name == "a" else safe_find(item, By.TAG_NAME, "a")
+        url = link_el.get_attribute("href") if link_el else ""
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "Check Point", "location": "חיפה",
+                         "description": desc, "source": "CheckPoint"})
+    if not jobs:
+        for a in safe_finds(driver, By.TAG_NAME, "a"):
+            href = a.get_attribute("href") or ""
+            t = a.text.strip()
+            if t and len(t) > 5 and is_tech(t) and "/job" in href.lower():
+                jobs.append({"title": t, "url": href, "company": "Check Point", "location": "חיפה",
+                             "description": "", "source": "CheckPoint"})
+    print(f"  CheckPoint: {len(jobs)} jobs")
+    return jobs
+
+
+def parse_apple(driver):
+    """Apple Haifa"""
+    driver.get("https://jobs.apple.com/he-il/search?location=haifa-HAF")
+    wait_for(driver, By.TAG_NAME, "body", 10)
+    jobs = []
+    for item in safe_finds(driver, By.CSS_SELECTOR, "[class*=job], [class*=Job], article, .result, .card, tr"):
+        title_el = safe_find(item, By.CSS_SELECTOR, "h3, h4, a, [class*=title]")
+        title = title_el.text.strip() if title_el else ""
+        if not title: continue
+        link_el = safe_find(item, By.TAG_NAME, "a") or title_el
+        url = link_el.get_attribute("href") if link_el else ""
+        loc_el = safe_find(item, By.CSS_SELECTOR, "[class*=location], [class*=Location]")
+        location = loc_el.text.strip() if loc_el else "חיפה"
+        desc = item.text[:300]
+        if is_tech(title):
+            jobs.append({"title": title, "url": url, "company": "Apple", "location": location,
+                         "description": desc, "source": "Apple"})
+    print(f"  Apple: {len(jobs)} jobs")
+    return jobs
+
+
+ADZUNA_ID = os.environ.get("ADZUNA_ID", "89fc5699")
+ADZUNA_KEY = os.environ.get("ADZUNA_KEY", "a418d498078a17504f42e30822a1ed8a")
+
+def parse_adzuna(driver=None):
+    """Adzuna API - tech jobs in north Israel, no Selenium needed.
+    Covers jobs from Indeed, AllJobs, CareerJet, JobMaster, Drushim, etc."""
+    jobs = []
+    seen = set()
+
+    cities = ["Haifa", "Karmiel", "Nazareth", "Yokneam", "Afula", "Tiberias",
+              "Nahariya", "Akko", "Kiryat+Shmona", "Safed", "Kiryat+Motzkin",
+              "Kiryat+Bialik", "Kiryat+Yam", "Kiryat+Ata", "Nesher",
+              "Zikhron+Yaakov", "Hadera", "Pardes+Hanna", "Or+Akiva"]
+    keywords = ["software", "developer", "engineer", "qa", "devops", "data",
+                "full+stack", "backend", "frontend", "programmer", "web",
+                "cyber", "security", "cloud", "ai", "ml", "product+manager",
+                "ux", "ui", "analyst", "embedded", "support", "it"]
+
+    # Multiple query combinations to maximize coverage
+    queries = []
+    for city in cities:
+        queries.append({"what": "software developer", "where": city})
+        queries.append({"what": "engineer", "where": city})
+    # Also search without city for broader results
+    queries.append({"what": "software Haifa", "where": "Israel"})
+    queries.append({"what": "developer Haifa", "where": "Israel"})
+    queries.append({"what": "qa Haifa", "where": "Israel"})
+    queries.append({"what": "devops Haifa", "where": "Israel"})
+
+    for q in queries[:30]:  # limit to 30 queries
+        what = q["what"]
+        where = q["where"]
+        url = (f"https://api.adzuna.com/v1/api/jobs/il/search/1?"
+               f"app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}"
+               f"&what={what}&where={where}&category=it-jobs"
+               f"&content-type=application/json&results_per_page=50"
+               f"&sort_by=date")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            resp = urllib.request.urlopen(req, timeout=15)
+            data = json.loads(resp.read().decode())
+            for item in data.get("results", []):
+                title = item.get("title", "").strip()
+                if not title: continue
+                jid = item.get("id", "") or hashlib.md5(title.encode()).hexdigest()[:8]
+                if jid in seen: continue
+                seen.add(jid)
+                company = ""
+                co = item.get("company")
+                if co: company = co.get("display_name", "")
+                location = item.get("location", {}).get("display_name", "")
+                desc = item.get("description", "")[:300]
+                if is_tech(title):
+                    jobs.append({"title": title, "id": jid, "url": item.get("redirect_url", ""),
+                                 "company": company, "location": location, "description": desc,
+                                 "source": "Adzuna"})
+        except Exception as e:
+            pass
+    print(f"  Adzuna: {len(jobs)} jobs (from {len(queries)} queries)")
+    return jobs
+
+
 def try_generic(driver, source_name):
     """Generic heuristic: find any text that looks like a job listing"""
     jobs = []
@@ -779,7 +1056,6 @@ def try_generic(driver, source_name):
 # SOURCE REGISTRY
 # ============================================================
 SOURCES = [
-    # Blocked from GAS (NetFree on local machine, should work from GitHub)
     ("Geektime", parse_geektime),
     ("GeektimeCareers", parse_geektime_careers),
     ("JobKarov", parse_jobkarov),
@@ -799,6 +1075,28 @@ SOURCES = [
     ("Hever", parse_hever),
     ("Experis", parse_experis),
     ("JobMaster", parse_jobmaster),
+    ("GotFriends", parse_gotfriends),
+    ("Jobify", parse_jobify),
+    ("Jobnet", parse_jobnet),
+    ("Nortech", parse_nortech),
+    ("Drushim", parse_drushim),
+    ("Extreme", parse_extreme),
+    # New recruitment agency sources
+    ("Ortal", parse_ortal),
+    ("Adecco", parse_adecco),
+    ("Koren", parse_koren),
+    ("Matrix", parse_matrix),
+    ("LDR", parse_ldr),
+    # Direct employer career pages
+    ("Elbit", parse_elbit),
+    ("Rafael", parse_rafael),
+    ("Technion", parse_technion),
+    ("Wix", parse_wix),
+    ("Intel", parse_intel),
+    ("CheckPoint", parse_checkpoint),
+    ("Apple", parse_apple),
+    # API-based (no Selenium needed)
+    ("Adzuna", parse_adzuna),
 ]
 
 # ============================================================
@@ -855,8 +1153,11 @@ def write_rss(rss, filename="rss.xml"):
 # ============================================================
 # MAIN
 # ============================================================
+API_SOURCES = {"Adzuna"}
+
 def main():
-    driver = get_driver()
+    driver = None
+    needs_driver = False
     all_jobs = []
 
     # Only run a subset if argument given (e.g., "scraper.py JobKarov")
@@ -866,8 +1167,21 @@ def main():
         if not sources_to_run:
             print(f"Unknown source: {sys.argv[1]}")
             print(f"Available: {', '.join(s[0] for s in SOURCES)}")
-            driver.quit()
             return
+
+    for name, _ in sources_to_run:
+        if name not in API_SOURCES:
+            needs_driver = True
+            break
+
+    if needs_driver:
+        try:
+            driver = get_driver()
+        except Exception as e:
+            print(f"Failed to init driver: {e}")
+            print("Running API-only sources...")
+            sources_to_run = [s for s in sources_to_run if s[0] in API_SOURCES]
+            driver = None
 
     print(f"Running {len(sources_to_run)} sources...")
     all_seen_ids = set()
@@ -876,7 +1190,7 @@ def main():
             print(f"\n--- {name} ---")
             jobs = parser(driver)
             jobs = [j for j in jobs if is_tech(j["title"])]
-            if not jobs:
+            if not jobs and driver is not None and name not in API_SOURCES:
                 dump_debug(driver, name)
                 jobs = try_generic(driver, name)
                 if jobs:
@@ -890,17 +1204,19 @@ def main():
             msg = str(e)[:100]
             print(f"  ERROR: {msg}")
             try:
-                dump_debug(driver, name)
-                jobs = try_generic(driver, name)
-                if jobs:
-                    print(f"  GENERIC fallback: {len(jobs)} jobs")
-                    all_jobs.extend(jobs)
+                if driver:
+                    dump_debug(driver, name)
+                    jobs = try_generic(driver, name)
+                    if jobs:
+                        print(f"  GENERIC fallback: {len(jobs)} jobs")
+                        all_jobs.extend(jobs)
             except: pass
         except Exception as e:
             msg = str(e)[:100]
             print(f"  ERROR: {msg}")
  
-    driver.quit()
+    if driver:
+        driver.quit()
 
     print(f"\n=== Total: {len(all_jobs)} jobs from {len(sources_to_run)} sources ===")
 
