@@ -1,3 +1,25 @@
+# ============================================================
+# SYSTEM OVERVIEW
+# ============================================================
+# Python Selenium scraper for Israeli tech jobs in Haifa/North.
+# Runs on GitHub Actions daily at 06:00 UTC, produces RSS feed
+# consumed by a Google Apps Script via GitHub Pages.
+#
+# GITHUB REPO: https://github.com/cht20750-bit/job-rss
+# WORKFLOW: .github/workflows/run.yml (schedule: 0 6 * * * UTC)
+# PAGES URL: https://cht20750-bit.github.io/job-rss/rss.xml
+#
+# GAS SCRIPT: C:\Users\חנן\Documents\חנן\ענינים שונים\תוכנות\עבודה סקיפט\‏‏מסמך טקסט חדש.txt
+# (Google Apps Script reads RSS + sends email to SHOSHI3186@GMAIL.COM)
+#
+# SOURCES (35 total):
+# GotFriends, Jobify, Experis, JobMaster, Jobnet, Nortech, JobKarov,
+# Drushim, Extreme, Misrot, AllJobs, Indeed, Nisha, CareerJet, Dialog,
+# Geektime, GeektimeCareers, Yad2, CPS, SQLink, Manpower, Jobinfo,
+# Ethosia, KamaTech, GovJobs, Hever, LinkedIn, LinkedIn2, Technion,
+# Wix, Intel, CheckPoint, Apple, MalamTeam, Danel, Ness, GalilSoft, HPE
+# ============================================================
+
 import os, sys, json, time, re, hashlib, urllib.request
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape
