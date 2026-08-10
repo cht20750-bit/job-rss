@@ -83,11 +83,26 @@ def get_driver():
     opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("useAutomationExtension", False)
     opts.page_load_strategy = 'normal'
-    service = Service(ChromeDriverManager().install())
-    d = webdriver.Chrome(service=service, options=opts)
-    d.set_page_load_timeout(45)
-    d.set_script_timeout(30)
-    return d
+    
+    # Try using system Chrome/ChromeDriver first (GitHub Actions)
+    try:
+        d = webdriver.Chrome(options=opts)
+        d.set_page_load_timeout(45)
+        d.set_script_timeout(30)
+        return d
+    except Exception:
+        pass
+    
+    # Fall back to webdriver-manager
+    try:
+        service = Service(ChromeDriverManager().install())
+        d = webdriver.Chrome(service=service, options=opts)
+        d.set_page_load_timeout(45)
+        d.set_script_timeout(30)
+        return d
+    except Exception as e:
+        print(f"Failed to create driver: {e}")
+        raise
 
 def is_north(text):
     if not text: return False
