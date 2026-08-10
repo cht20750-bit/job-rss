@@ -24,14 +24,8 @@ jobs:
           chrome-version: stable
       - run: pip install -r requirements.txt
       - run: python scraper.py
-      - name: Commit and push
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/
-          if ! git diff --cached --quiet; then
-            git commit -m "Update RSS [skip ci]"
-            git push https://${{ github.token }}@github.com/${{ github.repository }}.git HEAD:master
-          else
-            echo "No changes to commit"
-          fi
+      - name: Upload RSS
+        uses: actions/upload-artifact@v4
+        with:
+          name: rss-feed
+          path: docs/
